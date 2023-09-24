@@ -1,54 +1,40 @@
-import React, { Component } from 'react';
+import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ModalStyled, Overlay } from './Modal.styled';
 import { disablePageScroll, enablePageScroll } from 'scroll-lock';
 
-export default class Modal extends Component {
-  state = {
-    modalWindow: null,
-  };
+const Modal = ({ largeImageURL, tags, handleCloseModal }) => {
+  useEffect(() => {
+    const handlEsc = e => {
+      if (e.code === 'Escape') {
+        handleCloseModal();
+      }
+    };
+    document.addEventListener('keydown', handlEsc);
+    disablePageScroll();
+    return () => {
+      document.removeEventListener('keydown', handlEsc);
+      enablePageScroll();
+    };
+  }, [handleCloseModal]);
 
-  componentDidMount() {
-    const modalWindow = document.querySelector('#root-modal');
-    document.addEventListener('keydown', this.handleEsc);
-    if (modalWindow) {
-      this.setState({ modalWindow });
-      disablePageScroll();
-    }
-  }
-
-  componentWillUnmount() {
-    document.removeEventListener('keydown', this.handleEsc);
-    enablePageScroll();
-  }
-
-  handleEsc = e => {
-    if (e.code === 'Escape') {
-      this.props.handleCloseModal();
-    }
-  };
-
-  handleBackdropClick = e => {
+  const handleBackdropClick = e => {
     if (e.target === e.currentTarget) {
-      this.props.handleCloseModal();
+      handleCloseModal();
     }
   };
-
-  render() {
-    const { modalWindow } = this.state;
-    const { largeImageURL, tags } = this.props;
-
-    if (!modalWindow) {
-      return null;
-    }
-
-    return createPortal(
-      <Overlay onClick={this.handleBackdropClick}>
-        <ModalStyled>
-          <img src={largeImageURL} alt={tags} />
-        </ModalStyled>
-      </Overlay>,
-      modalWindow
-    );
+  const modalWindow = document.querySelector('#root-modal');
+  if (!modalWindow) {
+    return null;
   }
-}
+  return createPortal(
+    <Overlay onClick={handleBackdropClick}>
+      <ModalStyled>
+        <img src={largeImageURL} alt={tags} />
+      </ModalStyled>
+    </Overlay>,
+    modalWindow
+  );
+};
+
+export default Modal;

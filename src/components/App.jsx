@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import React, { useState, useEffect } from 'react';
 import Searchbar from './Searchbar/Searchbar';
 import ImageGallery from './ImageGallery/ImageGallery';
 import { getPhotosService } from '../Service/Service';
@@ -10,126 +10,95 @@ import Button from './Button/Button';
 
 const ITEMS_PER_PAGE = 12;
 
-export default class App extends Component {
-  state = {
-    searchQuery: '',
-    gallery: [],
-    currentPage: 1,
-    quantityPage: null,
-    error: null,
-    isLoading: false,
-    showModal: false,
-    largeImageURL: null,
-    tags: null,
-  };
+const App = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [gallery, setGallery] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [quantityPage, setQuantityPage] = useState(null);
+  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [largeImageURL, setLargeImageURL] = useState(null);
+  const [tags, setTags] = useState(null);
 
-  componentDidUpdate(_, prevState) {
-    const { currentPage, searchQuery } = this.state;
-
-    if (
-      currentPage !== prevState.currentPage ||
-      searchQuery !== prevState.searchQuery
-    ) {
-      this.fetchGallery();
-    }
-  }
-
-  fetchGallery = async () => {
-    const { searchQuery, currentPage } = this.state;
-
-    this.toggleLoading(true);
-
-    try {
-      const { hits, totalHits } = await getPhotosService(
-        searchQuery,
-        currentPage
-      );
-
-      if (hits.length === 0) {
-        Notify.failure(
-          'Sorry, there are no images matching your search query. Please try again.'
-        );
+  useEffect(() => {
+    const fetchGallery = async () => {
+      if (!searchQuery.trim()) {
+        Notify.info('Please enter a search query.');
         return;
       }
 
-      this.updateGallery(hits, totalHits);
-    } catch (err) {
-      this.setState({ error: err.message });
-    } finally {
-      this.toggleLoading(false);
+      setIsLoading(true);
+
+      try {
+        const { hits, totalHits } = await getPhotosService(
+          searchQuery,
+          currentPage
+        );
+
+        if (hits.length === 0) {
+          Notify.failure(
+            'Sorry, there are no images matching your search query. Please try again.'
+          );
+          return;
+        }
+
+        setGallery(prevGallery => [...prevGallery, ...hits]);
+        setQuantityPage(Math.ceil(totalHits / ITEMS_PER_PAGE));
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (searchQuery) {
+      fetchGallery();
     }
+  }, [searchQuery, currentPage]);
+
+  const handleFormSubmit = query => {
+    setSearchQuery(query);
+    setGallery([]);
+    setCurrentPage(1);
+    setQuantityPage(null);
+    setError(null);
   };
 
-  toggleLoading = isLoading => {
-    this.setState({ isLoading });
+  const handleModal = obj => {
+    setIsLoading(true);
+    setShowModal(true);
+    setLargeImageURL(obj.largeImageURL);
+    setTags(obj.tags);
   };
 
-  updateGallery = (hits, totalHits) => {
-    this.setState(prev => ({
-      gallery: [...prev.gallery, ...hits],
-      quantityPage: Math.ceil(totalHits / ITEMS_PER_PAGE),
-    }));
+  const handleCloseModal = () => {
+    setIsLoading(false);
+    setShowModal(false);
   };
 
-  handleFormSubmit = searchQuery => {
-    this.resetGallery();
-    this.setState({ searchQuery });
+  const handleBtnLoad = () => {
+    setCurrentPage(prevPage => prevPage + 1);
   };
 
-  resetGallery = () => {
-    this.setState({
-      currentPage: 1,
-      quantityPage: null,
-      gallery: [],
-      error: null,
-    });
-  };
+  return (
+    <AppContainer>
+      <Searchbar onSubmit={handleFormSubmit} />
+      {isLoading && <Loader />}
+      {error && Notify.failure(error)}
+      {gallery.length > 0 && (
+        <ImageGallery hits={gallery} onClick={handleModal} />
+      )}
+      {currentPage < quantityPage && <Button handleBtnLoad={handleBtnLoad} />}
+      {showModal && (
+        <Modal
+          largeImageURL={largeImageURL}
+          tags={tags}
+          handleCloseModal={handleCloseModal}
+        />
+      )}
+    </AppContainer>
+  );
+};
 
-  handleModal = obj => {
-    this.toggleLoading(true);
-    this.setState({ showModal: true, ...obj });
-  };
-
-  handleCloseModal = () => {
-    this.toggleLoading(false);
-    this.setState({ showModal: false });
-  };
-
-  handleBtnLoad = () => {
-    this.setState(prev => ({ currentPage: prev.currentPage + 1 }));
-  };
-
-  render() {
-    const {
-      error,
-      gallery,
-      isLoading,
-      showModal,
-      largeImageURL,
-      tags,
-      currentPage,
-      quantityPage,
-    } = this.state;
-
-    return (
-      <AppContainer>
-        <Searchbar onSubmit={this.handleFormSubmit} />
-        {isLoading && <Loader />}
-        {error && Notify.failure(error)}
-        {gallery.length > 0 && (
-          <ImageGallery hits={gallery} onClick={this.handleModal} />
-        )}
-        {currentPage < quantityPage && (
-          <Button handleBtnLoad={this.handleBtnLoad} />
-        )}
-        {showModal && (
-          <Modal
-            largeImageURL={largeImageURL}
-            tags={tags}
-            handleCloseModal={this.handleCloseModal}
-          />
-        )}
-      </AppContainer>
-    );
-  }
-}
+export default App;
